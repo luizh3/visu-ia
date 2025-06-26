@@ -1,0 +1,151 @@
+import type { HttpContext } from '@adonisjs/core/http'
+import Clothing from '#models/clothing'
+
+export default class ClothingController {
+  /**
+   * Display a list of resource
+   */
+  async index({ inertia, request, response }: HttpContext) {
+    const searchTerm = request.input('search')
+    const page = Number(request.input('page', 1))
+    const limit = Number(request.input('limit', 12))
+
+    let clothesQuery = Clothing.query()
+
+    if (searchTerm) {
+      clothesQuery = clothesQuery.where('name', 'like', `%${searchTerm}%`)
+    }
+
+    const clothes = await clothesQuery.paginate(page, limit)
+    const totalClothes = clothes.total
+    const hasMore = clothes.hasMorePages
+
+    // Se for uma requisição AJAX (para paginação infinita), retorna JSON
+    if (request.header('X-Requested-With') === 'XMLHttpRequest') {
+      return response.json({
+        clothes: clothes.all(),
+        hasMore,
+        currentPage: page
+      })
+    }
+
+    return inertia.render('clothing/index', {
+      clothes: clothes.all(),
+      totalClothes,
+      searchTerm,
+      hasMore,
+      currentPage: page
+    })
+  }
+
+  /**
+   * Display form to create a new record
+  */
+  async create({ inertia }: HttpContext) {
+    return inertia.render('clothing/create')
+  }
+
+  /**
+   * Handle form submission for the create action
+   */
+  async store({ request, response }: HttpContext) {
+    const data: any = request.only(['name', 'description', 'type', 'color', 'size'])
+    const allowedTypes = ['chapéu', 'camiseta', 'calça', 'tênis']
+    if (!allowedTypes.includes(data.type)) {
+      return response.badRequest('Tipo de roupa inválido.')
+    }
+    const imageFile = request.file('image')
+    if (imageFile) {
+      const fileName = `${Date.now()}_${imageFile.clientName}`
+      await imageFile.move('public/uploads', { name: fileName })
+      data.image = `/uploads/${fileName}`
+    }
+    const clothing = await Clothing.create(data)
+    return response.redirect('/')
+  }
+
+  /**
+   * Show individual record
+   */
+  async show({ params, inertia, response }: HttpContext) {
+    const id = Number(params.id)
+    if (!id || isNaN(id)) {
+      return response.badRequest('ID inválido')
+    }
+    const clothing = await Clothing.find(id)
+    if (!clothing) {
+      return response.notFound('Roupa não encontrada')
+    }
+    return inertia.render('clothing/show', { clothing })
+  }
+
+  /**
+   * Edit individual record
+   */
+  async edit() { }
+
+  /**
+   * Handle form submission for the edit action
+   */
+  async update() { }
+
+  /**
+   * Delete record
+   */
+  async destroy({ params, response, request }: HttpContext) {
+    const id = Number(params.id)
+    if (!id || isNaN(id)) {
+      return response.badRequest('ID inválido')
+    }
+    const clothing = await Clothing.find(id)
+    if (!clothing) {
+      return response.notFound('Roupa não encontrada')
+    }
+    await clothing.delete()
+
+    // Se for uma requisição AJAX, retorna JSON
+    if (request.header('X-Requested-With') === 'XMLHttpRequest') {
+      return response.ok({ success: true, message: 'Roupa deletada com sucesso' })
+    }
+
+    // Se for uma requisição normal, faz redirect
+    return response.redirect('/')
+  }
+
+  async toggleFavorite({ params, response }: HttpContext) {
+    const id = Number(params.id)
+    if (!id || isNaN(id)) {
+      return response.badRequest('ID inválido')
+    }
+    const clothing = await Clothing.find(id)
+    if (!clothing) {
+      return response.notFound('Roupa não encontrada')
+    }
+    clothing.favorite = !clothing.favorite
+    await clothing.save()
+    return response.ok({ favorite: clothing.favorite })
+  }
+
+  async favorites({ inertia }: HttpContext) {
+    const clothes = await Clothing.query().where('favorite', true)
+    return inertia.render('clothing/favorites', { clothes })
+  }
+
+  /**
+   * API endpoint para busca em tempo real
+   */
+  async search({ request, response }: HttpContext) {
+    const query = request.input('q')
+
+    if (!query || query.trim().length < 2) {
+      return response.json([])
+    }
+
+    const clothes = await Clothing.query()
+      .where('name', 'like', `%${query.trim()}%`)
+      .limit(10)
+      .exec()
+
+    return response.json(clothes)
+  }
+}

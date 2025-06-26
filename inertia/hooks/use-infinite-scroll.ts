@@ -1,0 +1,62 @@
+import { useEffect, useRef, useState, useCallback } from 'react'
+
+interface UseInfiniteScrollOptions {
+    hasMore: boolean
+    onLoadMore: () => Promise<void>
+    threshold?: number
+    rootMargin?: string
+}
+
+export function useInfiniteScroll({
+    hasMore,
+    onLoadMore,
+    threshold = 0.1,
+    rootMargin = '100px'
+}: UseInfiniteScrollOptions) {
+    const [isLoading, setIsLoading] = useState(false)
+    const observerRef = useRef<HTMLDivElement>(null)
+
+    const loadMore = useCallback(async () => {
+        if (isLoading || !hasMore) return
+
+        setIsLoading(true)
+        try {
+            await onLoadMore()
+        } catch (error) {
+            console.error('Erro ao carregar mais itens:', error)
+        } finally {
+            setIsLoading(false)
+        }
+    }, [isLoading, hasMore, onLoadMore])
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                const target = entries[0]
+                if (target.isIntersecting && hasMore && !isLoading) {
+                    loadMore()
+                }
+            },
+            {
+                threshold,
+                rootMargin
+            }
+        )
+
+        const currentRef = observerRef.current
+        if (currentRef) {
+            observer.observe(currentRef)
+        }
+
+        return () => {
+            if (currentRef) {
+                observer.unobserve(currentRef)
+            }
+        }
+    }, [hasMore, isLoading, loadMore, threshold, rootMargin])
+
+    return {
+        observerRef,
+        isLoading
+    }
+} 
