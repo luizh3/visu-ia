@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import Navbar from '../../components/components/ui/navbar'
 import { Button } from '../../components/components/ui/button'
 import ClothingSelect from '../../components/components/ui/clothing-select'
+import ColorHarmonyAnalyzer from '../../components/components/ui/color-harmony-analyzer'
 import type { Clothing } from '../../types/clothing'
 import { Shirt, User, GripVertical, Footprints, Shuffle } from 'lucide-react'
 
@@ -55,33 +56,10 @@ export default function LookCreate() {
         setSelected(cleared)
     }
 
-    function getColorPercentages(selected: Record<string, Clothing | null>) {
-        const colorCount: Record<string, number> = {}
-        let total = 0
-        Object.values(selected).forEach(item => {
-            if (item && item.color) {
-                const color = item.color.toUpperCase()
-                colorCount[color] = (colorCount[color] || 0) + 1
-                total++
-            }
-        })
-        return Object.entries(colorCount).map(([color, count]) => ({
-            color,
-            percent: total > 0 ? Math.round((count / total) * 100) : 0
-        }))
-    }
-
-    function getContrastYIQ(hexcolor: string) {
-        hexcolor = hexcolor.replace('#', '')
-        if (hexcolor.length !== 6) return '#000'
-        const r = parseInt(hexcolor.substr(0, 2), 16)
-        const g = parseInt(hexcolor.substr(2, 2), 16)
-        const b = parseInt(hexcolor.substr(4, 2), 16)
-        const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000
-        return (yiq >= 128) ? '#000' : '#fff'
-    }
-
-    const colorPercentages = getColorPercentages(selected)
+    // Extrai as cores das peças selecionadas para análise de harmonia
+    const selectedColors = Object.values(selected)
+        .filter(item => item && item.color)
+        .map(item => item!.color)
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -91,8 +69,8 @@ export default function LookCreate() {
                 {loading ? (
                     <div>Carregando opções...</div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="lg:col-span-1">
                             <h2 className="text-xl font-semibold text-gray-800 mb-6">Escolha uma peça para cada parte do corpo</h2>
                             <form className="space-y-6">
                                 {PARTS.map(part => (
@@ -124,47 +102,43 @@ export default function LookCreate() {
                                 </button>
                             </div>
                         </div>
-                        <div>
-                            <h2 className="text-xl font-semibold text-gray-800 mb-6">Preview do Look</h2>
-                            <div className="bg-gray-100 rounded-lg shadow p-6 min-h-[400px] w-full relative flex items-center justify-center">
-                                {colorPercentages.length > 0 && (
-                                    <div className="absolute left-6 top-6 flex flex-col items-start">
-                                        {colorPercentages.map(c => (
-                                            <div key={c.color} className="flex items-center mb-2">
-                                                <div
-                                                    className="w-10 h-10 rounded-full border shadow flex items-center justify-center text-sm font-bold mr-2"
-                                                    style={{ background: c.color, color: getContrastYIQ(c.color) }}
-                                                    title={c.color}
-                                                >
-                                                    {c.percent}%
-                                                </div>
-                                                <span className="text-xs">{c.color}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                                <div className="mx-auto flex flex-col justify-center items-center w-full max-w-md">
-                                    <div className="grid grid-cols-1 gap-4 w-full">
-                                        {PARTS.map(part => (
-                                            <div key={part.key} className="flex flex-col items-center">
-                                                <span className="text-gray-500 text-sm mb-1">{part.label}</span>
-                                                {selected[part.key]?.image ? (
-                                                    <img
-                                                        src={selected[part.key]!.image}
-                                                        alt={selected[part.key]!.name}
-                                                        className="h-32 object-contain mb-2"
-                                                        style={{ maxWidth: 120 }}
-                                                    />
-                                                ) : (
-                                                    <div className="h-32 w-24 flex flex-col items-center justify-center bg-gray-200 rounded text-center">
-                                                        <span className="mb-2">{part.icon}</span>
-                                                        <span className="text-xs text-gray-500 mt-2">{part.label}</span>
+
+                        <div className="lg:col-span-2">
+                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                                {/* Preview do Look */}
+                                <div>
+                                    <h2 className="text-xl font-semibold text-gray-800 mb-6">Preview do Look</h2>
+                                    <div className="bg-gray-100 rounded-lg shadow p-6 min-h-[400px] w-full relative flex items-center justify-center">
+                                        <div className="mx-auto flex flex-col justify-center items-center w-full max-w-md">
+                                            <div className="grid grid-cols-1 gap-4 w-full">
+                                                {PARTS.map(part => (
+                                                    <div key={part.key} className="flex flex-col items-center">
+                                                        <span className="text-gray-500 text-sm mb-1">{part.label}</span>
+                                                        {selected[part.key]?.image ? (
+                                                            <img
+                                                                src={selected[part.key]!.image}
+                                                                alt={selected[part.key]!.name}
+                                                                className="h-32 object-contain mb-2"
+                                                                style={{ maxWidth: 120 }}
+                                                            />
+                                                        ) : (
+                                                            <div className="h-32 w-24 flex flex-col items-center justify-center bg-gray-200 rounded text-center">
+                                                                <span className="mb-2">{part.icon}</span>
+                                                                <span className="text-xs text-gray-500 mt-2">{part.label}</span>
+                                                            </div>
+                                                        )}
+                                                        <span className="text-xs text-gray-600">{selected[part.key]?.name || 'Nenhuma selecionada'}</span>
                                                     </div>
-                                                )}
-                                                <span className="text-xs text-gray-600">{selected[part.key]?.name || 'Nenhuma selecionada'}</span>
+                                                ))}
                                             </div>
-                                        ))}
+                                        </div>
                                     </div>
+                                </div>
+
+                                {/* Análise de Harmonia */}
+                                <div>
+                                    <h2 className="text-xl font-semibold text-gray-800 mb-6">Análise de Harmonia</h2>
+                                    <ColorHarmonyAnalyzer colors={selectedColors} />
                                 </div>
                             </div>
                         </div>

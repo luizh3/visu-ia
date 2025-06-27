@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { router } from '@inertiajs/react'
 import { Button } from '../../components/components/ui/button'
 import CustomInput from '../../components/components/ui/custom-input'
 import CustomTextarea from '../../components/components/ui/custom-textarea'
@@ -25,6 +26,7 @@ export default function ClothingCreate() {
     })
     const [image, setImage] = useState<File | null>(null)
     const [imagePreview, setImagePreview] = useState<string | null>(null)
+    const [isSubmitting, setIsSubmitting] = useState(false)
     const { csrfToken } = useCsrf()
 
     function handleNameChange(name: string) {
@@ -56,6 +58,41 @@ export default function ClothingCreate() {
         }
     }
 
+    function handleSubmit(e: React.FormEvent) {
+        e.preventDefault()
+
+        if (!form.name || !form.type || !form.size) {
+            alert('Por favor, preencha todos os campos obrigatórios.')
+            return
+        }
+
+        setIsSubmitting(true)
+
+        // Create FormData for file upload
+        const formData = new FormData()
+        formData.append('_csrf', csrfToken)
+        formData.append('name', form.name)
+        formData.append('description', form.description)
+        formData.append('type', form.type)
+        formData.append('color', form.color)
+        formData.append('size', form.size)
+
+        if (image) {
+            formData.append('image', image)
+        }
+
+        // Use Inertia router to submit the form
+        router.post('/clothing', formData, {
+            onSuccess: () => {
+                setIsSubmitting(false)
+            },
+            onError: (errors) => {
+                setIsSubmitting(false)
+                console.error('Erro ao salvar:', errors)
+            }
+        })
+    }
+
     return (
         <div className="min-h-screen bg-gray-50">
             <div className="max-w-6xl mx-auto py-8">
@@ -63,9 +100,7 @@ export default function ClothingCreate() {
                 <div className="flex justify-center">
                     <div className="w-full max-w-6xl">
                         <h1 className="text-2xl font-bold mb-6">Cadastrar nova roupa</h1>
-                        <form method="POST" action="/clothing" className="space-y-6" encType="multipart/form-data">
-                            <input type="hidden" name="_csrf" value={csrfToken} />
-
+                        <form onSubmit={handleSubmit} className="space-y-6">
                             <CustomInput
                                 value={form.name}
                                 onChange={handleNameChange}
@@ -91,7 +126,6 @@ export default function ClothingCreate() {
                                 label="Tipo de Roupa"
                                 placeholder="Selecione o tipo de roupa..."
                             />
-                            <input type="hidden" name="type" value={form.type} />
 
                             <SizeSelect
                                 value={form.size}
@@ -100,7 +134,6 @@ export default function ClothingCreate() {
                                 label="Tamanho"
                                 placeholder="Selecione o tamanho..."
                             />
-                            <input type="hidden" name="size" value={form.size} />
 
                             <ImageUploadColorPicker
                                 imageFile={image}
@@ -110,9 +143,14 @@ export default function ClothingCreate() {
                                 onColorChange={handleColorChange}
                                 label="Imagem e Cor da Roupa"
                             />
-                            <input type="hidden" name="color" value={form.color} />
 
-                            <Button type="submit" className="w-full">Salvar Roupa</Button>
+                            <Button
+                                type="submit"
+                                className="w-full"
+                                disabled={isSubmitting}
+                            >
+                                {isSubmitting ? 'Salvando...' : 'Salvar Roupa'}
+                            </Button>
                         </form>
                     </div>
                 </div>

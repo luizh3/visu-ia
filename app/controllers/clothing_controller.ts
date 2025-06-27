@@ -20,15 +20,6 @@ export default class ClothingController {
     const totalClothes = clothes.total
     const hasMore = clothes.hasMorePages
 
-    // Se for uma requisição AJAX (para paginação infinita), retorna JSON
-    if (request.header('X-Requested-With') === 'XMLHttpRequest') {
-      return response.json({
-        clothes: clothes.all(),
-        hasMore,
-        currentPage: page
-      })
-    }
-
     return inertia.render('clothing/index', {
       clothes: clothes.all(),
       totalClothes,
@@ -49,19 +40,64 @@ export default class ClothingController {
    * Handle form submission for the create action
    */
   async store({ request, response }: HttpContext) {
+    console.log('=== CLOTHING STORE REQUEST ===')
+    console.log('Request headers:', request.headers())
+    console.log('Request body:', request.body())
+
     const data: any = request.only(['name', 'description', 'type', 'color', 'size'])
+    console.log('Extracted data:', data)
+
     const allowedTypes = ['chapéu', 'camiseta', 'calça', 'tênis']
     if (!allowedTypes.includes(data.type)) {
+      console.log('Invalid type:', data.type)
       return response.badRequest('Tipo de roupa inválido.')
     }
+
     const imageFile = request.file('image')
+    console.log('Image file:', imageFile)
+
     if (imageFile) {
+      console.log('Processing image file...')
       const fileName = `${Date.now()}_${imageFile.clientName}`
-      await imageFile.move('public/uploads', { name: fileName })
-      data.image = `/uploads/${fileName}`
+      console.log('File name:', fileName)
+
+      try {
+        await imageFile.move('public/uploads', { name: fileName })
+        console.log('File moved successfully to:', `public/uploads/${fileName}`)
+        data.image = `/uploads/${fileName}`
+      } catch (error) {
+        console.error('Error moving file:', error)
+        return response.internalServerError('Erro ao salvar a imagem.')
+      }
+    } else {
+      console.log('No image file provided')
     }
-    const clothing = await Clothing.create(data)
-    return response.redirect('/')
+
+    console.log('Final data to save:', data)
+
+    try {
+      const clothing = await Clothing.create(data)
+      console.log('Clothing created successfully:', clothing.id)
+
+      // Se for uma requisição Inertia, retorna uma resposta JSON
+      if (request.header('X-Inertia')) {
+        return response.redirect('/')
+      }
+
+      return response.redirect('/')
+    } catch (error) {
+      console.error('Error creating clothing:', error)
+
+      // Se for uma requisição Inertia, retorna uma resposta JSON com erro
+      if (request.header('X-Inertia')) {
+        return response.badRequest({
+          message: 'Erro ao salvar a roupa.',
+          errors: error
+        })
+      }
+
+      return response.internalServerError('Erro ao salvar a roupa.')
+    }
   }
 
   /**
