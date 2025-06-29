@@ -21,6 +21,9 @@ export default class Clothing extends BaseModel {
   declare type: string
 
   @column()
+  declare category: string
+
+  @column()
   declare color: string
 
   @column()

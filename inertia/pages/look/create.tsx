@@ -110,24 +110,24 @@ export default function LookCreate() {
                                     <h2 className="text-xl font-semibold text-gray-800 mb-6">Preview do Look</h2>
                                     <div className="bg-gray-100 rounded-lg shadow p-6 min-h-[400px] w-full relative flex items-center justify-center">
                                         <div className="mx-auto flex flex-col justify-center items-center w-full max-w-md">
-                                            <div className="grid grid-cols-1 gap-4 w-full">
+                                            <div className="grid grid-cols-1 gap-6 w-full">
                                                 {PARTS.map(part => (
                                                     <div key={part.key} className="flex flex-col items-center">
-                                                        <span className="text-gray-500 text-sm mb-1">{part.label}</span>
+                                                        <h3 className="text-lg font-bold text-gray-800 mb-3">{part.label}</h3>
                                                         {selected[part.key]?.image ? (
                                                             <img
                                                                 src={selected[part.key]!.image}
                                                                 alt={selected[part.key]!.name}
-                                                                className="h-32 object-contain mb-2"
+                                                                className="h-32 object-contain mb-3"
                                                                 style={{ maxWidth: 120 }}
                                                             />
                                                         ) : (
-                                                            <div className="h-32 w-24 flex flex-col items-center justify-center bg-gray-200 rounded text-center">
-                                                                <span className="mb-2">{part.icon}</span>
-                                                                <span className="text-xs text-gray-500 mt-2">{part.label}</span>
+                                                            <div className="h-32 w-24 flex flex-col items-center justify-center bg-gray-200 rounded-lg border-2 border-dashed border-gray-300 text-center">
+                                                                <span className="mb-2 text-gray-400">{part.icon}</span>
+                                                                <span className="text-xs text-gray-500 font-medium">Vazio</span>
                                                             </div>
                                                         )}
-                                                        <span className="text-xs text-gray-600">{selected[part.key]?.name || 'Nenhuma selecionada'}</span>
+                                                        <span className="text-sm text-gray-600 font-medium">{selected[part.key]?.name || 'Nenhuma selecionada'}</span>
                                                     </div>
                                                 ))}
                                             </div>

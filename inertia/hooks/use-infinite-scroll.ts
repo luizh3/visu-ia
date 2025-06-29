@@ -5,16 +5,19 @@ interface UseInfiniteScrollOptions {
     onLoadMore: () => Promise<void>
     threshold?: number
     rootMargin?: string
+    debounceMs?: number
 }
 
 export function useInfiniteScroll({
     hasMore,
     onLoadMore,
     threshold = 0.1,
-    rootMargin = '100px'
+    rootMargin = '100px',
+    debounceMs = 300
 }: UseInfiniteScrollOptions) {
     const [isLoading, setIsLoading] = useState(false)
     const observerRef = useRef<HTMLDivElement>(null)
+    const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
     const loadMore = useCallback(async () => {
         if (isLoading || !hasMore) return
@@ -34,7 +37,15 @@ export function useInfiniteScroll({
             (entries) => {
                 const target = entries[0]
                 if (target.isIntersecting && hasMore && !isLoading) {
-                    loadMore()
+                    // Clear any existing timeout
+                    if (debounceTimeoutRef.current) {
+                        clearTimeout(debounceTimeoutRef.current)
+                    }
+
+                    // Debounce the load more call
+                    debounceTimeoutRef.current = setTimeout(() => {
+                        loadMore()
+                    }, debounceMs)
                 }
             },
             {
@@ -52,8 +63,11 @@ export function useInfiniteScroll({
             if (currentRef) {
                 observer.unobserve(currentRef)
             }
+            if (debounceTimeoutRef.current) {
+                clearTimeout(debounceTimeoutRef.current)
+            }
         }
-    }, [hasMore, isLoading, loadMore, threshold, rootMargin])
+    }, [hasMore, isLoading, loadMore, threshold, rootMargin, debounceMs])
 
     return {
         observerRef,

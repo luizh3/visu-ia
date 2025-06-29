@@ -19,6 +19,7 @@ export default function ClothingIndex({ clothes: initialClothes, totalClothes, s
     const [items, setItems] = useState<Clothing[]>(initialClothes)
     const [hasMore, setHasMore] = useState(initialHasMore)
     const [currentPageState, setCurrentPageState] = useState(currentPage)
+    const [isInitialLoading, setIsInitialLoading] = useState(false)
     const { fetchWithCsrf } = useCsrf()
 
     async function toggleFavorite(id: number) {
@@ -31,7 +32,7 @@ export default function ClothingIndex({ clothes: initialClothes, totalClothes, s
     }
 
     const loadMoreItems = async () => {
-        if (!hasMore) return
+        if (!hasMore || isLoading) return
 
         const nextPage = currentPageState + 1
         const searchParams = new URLSearchParams()
@@ -42,9 +43,10 @@ export default function ClothingIndex({ clothes: initialClothes, totalClothes, s
         }
 
         try {
-            const response = await fetch(`/?${searchParams.toString()}`, {
+            const response = await fetch(`/api/clothing?${searchParams.toString()}`, {
                 headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/json'
                 }
             })
 
@@ -61,7 +63,8 @@ export default function ClothingIndex({ clothes: initialClothes, totalClothes, s
 
     const { observerRef, isLoading } = useInfiniteScroll({
         hasMore,
-        onLoadMore: loadMoreItems
+        onLoadMore: loadMoreItems,
+        debounceMs: 500
     })
 
     // Reset items when search term changes
@@ -108,27 +111,27 @@ export default function ClothingIndex({ clothes: initialClothes, totalClothes, s
                     ))}
                 </div>
 
-                {/* Loading indicator */}
-                {isLoading && (
+                {/* Loading indicator - só mostra quando realmente está carregando mais itens */}
+                {isLoading && hasMore && items.length > 0 && (
                     <div className="mt-6">
                         <ClothingSkeletonGrid count={6} />
                     </div>
                 )}
 
-                {/* Intersection observer target */}
+                {/* Intersection observer target - só mostra se há mais itens */}
                 {hasMore && (
                     <div ref={observerRef} className="h-10 mt-6" />
                 )}
 
-                {/* End of results */}
-                {!hasMore && items.length > 0 && (
+                {/* End of results - só mostra se não há mais itens e há itens na lista */}
+                {!hasMore && items.length > 0 && !isLoading && (
                     <div className="text-center mt-8 text-gray-500">
                         Você chegou ao fim da lista!
                     </div>
                 )}
 
-                {/* No results */}
-                {items.length === 0 && !isLoading && (
+                {/* No results - só mostra se não há itens e não está carregando */}
+                {items.length === 0 && !isLoading && !isInitialLoading && (
                     <div className="text-center mt-8 text-gray-500">
                         {searchTerm ? 'Nenhum resultado encontrado para sua busca.' : 'Nenhuma roupa cadastrada ainda.'}
                     </div>

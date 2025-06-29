@@ -5,7 +5,7 @@ export default class ClothingController {
   /**
    * Display a list of resource
    */
-  async index({ inertia, request, response }: HttpContext) {
+  async index({ inertia, request }: HttpContext) {
     const searchTerm = request.input('search')
     const page = Number(request.input('page', 1))
     const limit = Number(request.input('limit', 12))
@@ -183,5 +183,29 @@ export default class ClothingController {
       .exec()
 
     return response.json(clothes)
+  }
+
+  /**
+   * API endpoint para paginação AJAX
+   */
+  async paginate({ request, response }: HttpContext) {
+    const searchTerm = request.input('search')
+    const page = Number(request.input('page', 1))
+    const limit = Number(request.input('limit', 12))
+
+    let clothesQuery = Clothing.query()
+
+    if (searchTerm) {
+      clothesQuery = clothesQuery.where('name', 'like', `%${searchTerm}%`)
+    }
+
+    const clothes = await clothesQuery.paginate(page, limit)
+
+    return response.json({
+      clothes: clothes.all(),
+      hasMore: clothes.hasMorePages,
+      currentPage: page,
+      total: clothes.total
+    })
   }
 }
