@@ -42,10 +42,13 @@ export default function CustomSelect({
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
 
-    const filteredOptions = options.filter(option =>
-        option.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        option.value.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    const filteredOptions = options.filter(option => {
+        const searchLower = searchTerm.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        const labelLower = option.label.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        const valueLower = option.value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+
+        return labelLower.includes(searchLower) || valueLower.includes(searchLower)
+    })
 
     const handleSelect = (option: SelectOption) => {
         onChange(option.value)

@@ -33,6 +33,7 @@ const CLOTHING_TYPES = [
     { value: 'cinto', label: 'Cinto' },
     { value: 'bolsa', label: 'Bolsa' },
     { value: 'mochila', label: 'Mochila' },
+    { value: 'tênis', label: 'Tênis' },
 ]
 
 export default function ClothingCreate() {

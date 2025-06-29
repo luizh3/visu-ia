@@ -50,7 +50,7 @@ export default class ClothingController {
     const allowedTypes = [
       'camiseta', 'calça', 'shorts', 'jaqueta', 'blusa', 'saia', 'suéter',
       'moletom', 'casaco', 'terno', 'maiô', 'roupa íntima', 'meias',
-      'sapatos', 'botas', 'sandálias', 'chapéu', 'boné', 'cachecol',
+      'sapatos', 'botas', 'sandálias', 'tênis', 'chapéu', 'boné', 'cachecol',
       'luvas', 'cinto', 'bolsa', 'mochila'
     ]
     if (!allowedTypes.includes(data.type)) {

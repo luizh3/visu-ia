@@ -7,10 +7,30 @@ import ClothingSelect from '~/components/components/ui/clothing-select'
 import apiConfig from '../../../config/api'
 
 const PARTS = [
-    { key: 'head', label: 'Cabeça', type: 'chapéu', icon: <User size={40} strokeWidth={1.5} /> },
-    { key: 'torso', label: 'Tronco', type: 'camiseta', icon: <Shirt size={40} strokeWidth={1.5} /> },
-    { key: 'legs', label: 'Pernas', type: 'calça', icon: <GripVertical size={40} strokeWidth={1.5} /> },
-    { key: 'feet', label: 'Pés', type: 'tênis', icon: <Footprints size={40} strokeWidth={1.5} /> },
+    {
+        key: 'head',
+        label: 'Cabeça',
+        types: ['chapéu', 'boné'],
+        icon: <User size={40} strokeWidth={1.5} />
+    },
+    {
+        key: 'torso',
+        label: 'Tronco',
+        types: ['camiseta', 'jaqueta', 'blusa', 'suéter', 'moletom', 'casaco', 'terno'],
+        icon: <Shirt size={40} strokeWidth={1.5} />
+    },
+    {
+        key: 'legs',
+        label: 'Pernas',
+        types: ['calça', 'shorts'],
+        icon: <GripVertical size={40} strokeWidth={1.5} />
+    },
+    {
+        key: 'feet',
+        label: 'Pés',
+        types: ['sapatos', 'botas', 'sandálias', 'tênis'],
+        icon: <Footprints size={40} strokeWidth={1.5} />
+    },
 ]
 
 export default function LookCreate() {
@@ -83,7 +103,16 @@ export default function LookCreate() {
     }
 
     function handleSelect(partKey: string, clothingId: string) {
-        const clothing = options[PARTS.find(p => p.key === partKey)!.type]?.find(c => String(c.id) === clothingId) || null
+        const part = PARTS.find(p => p.key === partKey)!
+        // Busca a peça em todos os tipos da região
+        let clothing: Clothing | null = null
+        for (const type of part.types) {
+            const found = options[type]?.find(c => String(c.id) === clothingId)
+            if (found) {
+                clothing = found
+                break
+            }
+        }
         setSelected(sel => ({ ...sel, [partKey]: clothing }))
         console.log("aaaaa")
         if (clothing) {
@@ -94,10 +123,16 @@ export default function LookCreate() {
     function handleRandomLook() {
         const newSelected: Record<string, Clothing | null> = {}
         PARTS.forEach(part => {
-            const items = options[part.type] || []
-            if (items.length > 0) {
-                const randomIdx = Math.floor(Math.random() * items.length)
-                newSelected[part.key] = items[randomIdx]
+            // Combina todas as peças de todos os tipos da região
+            const allItems: Clothing[] = []
+            part.types.forEach(type => {
+                const items = options[type] || []
+                allItems.push(...items)
+            })
+
+            if (allItems.length > 0) {
+                const randomIdx = Math.floor(Math.random() * allItems.length)
+                newSelected[part.key] = allItems[randomIdx]
             } else {
                 newSelected[part.key] = null
             }
@@ -110,6 +145,16 @@ export default function LookCreate() {
         const cleared: Record<string, Clothing | null> = {}
         PARTS.forEach(part => { cleared[part.key] = null })
         setSelected(cleared)
+    }
+
+    // Função para obter todas as opções de uma região
+    function getOptionsForPart(part: typeof PARTS[0]): Clothing[] {
+        const allItems: Clothing[] = []
+        part.types.forEach(type => {
+            const items = options[type] || []
+            allItems.push(...items)
+        })
+        return allItems
     }
 
     // Extrai as cores das peças selecionadas para análise de harmonia
@@ -132,11 +177,11 @@ export default function LookCreate() {
                                 {PARTS.map(part => (
                                     <div key={part.key}>
                                         <ClothingSelect
-                                            options={options[part.type] || []}
+                                            options={getOptionsForPart(part)}
                                             value={selected[part.key]?.id?.toString() || ''}
                                             onChange={(value) => handleSelect(part.key, value)}
                                             label={part.label}
-                                            placeholder={`Selecione um ${part.type}...`}
+                                            placeholder={`Selecione uma peça para ${part.label.toLowerCase()}...`}
                                         />
                                     </div>
                                 ))}

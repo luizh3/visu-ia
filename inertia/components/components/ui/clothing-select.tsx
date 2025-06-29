@@ -13,6 +13,8 @@ interface ClothingSelectProps {
 export default function ClothingSelect({ options, value, onChange, placeholder = "Selecione...", label }: ClothingSelectProps) {
     const [isOpen, setIsOpen] = useState(false)
     const [searchTerm, setSearchTerm] = useState('')
+    const [searchResults, setSearchResults] = useState<Clothing[]>([])
+    const [isSearching, setIsSearching] = useState(false)
     const dropdownRef = useRef<HTMLDivElement>(null)
 
     const selectedItem = options.find(item => String(item.id) === value)
@@ -28,10 +30,35 @@ export default function ClothingSelect({ options, value, onChange, placeholder =
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
 
-    const filteredOptions = options.filter(item =>
-        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.color?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    // Busca em tempo real na API
+    useEffect(() => {
+        const searchClothes = async () => {
+            if (searchTerm.trim().length < 2) {
+                setSearchResults([])
+                return
+            }
+
+            setIsSearching(true)
+            try {
+                const response = await fetch(`/api/search?q=${encodeURIComponent(searchTerm.trim())}`)
+                if (response.ok) {
+                    const data = await response.json()
+                    setSearchResults(data)
+                }
+            } catch (error) {
+                console.error('Erro na busca:', error)
+                setSearchResults([])
+            } finally {
+                setIsSearching(false)
+            }
+        }
+
+        const timeoutId = setTimeout(searchClothes, 300)
+        return () => clearTimeout(timeoutId)
+    }, [searchTerm])
+
+    // Usa os resultados da busca se houver termo de busca, senão usa as opções originais
+    const displayOptions = searchTerm.trim().length >= 2 ? searchResults : options
 
     const handleSelect = (item: Clothing) => {
         onChange(String(item.id))
@@ -99,20 +126,27 @@ export default function ClothingSelect({ options, value, onChange, placeholder =
             {isOpen && (
                 <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-80 overflow-hidden">
                     <div className="p-2 border-b border-gray-200">
-                        <input
-                            type="text"
-                            placeholder="Buscar por nome ou cor..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            onClick={(e) => e.stopPropagation()}
-                            autoFocus
-                        />
+                        <div className="relative">
+                            <input
+                                type="text"
+                                placeholder="Buscar por nome..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                onClick={(e) => e.stopPropagation()}
+                                autoFocus
+                            />
+                            {isSearching && (
+                                <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     <div className="max-h-64 overflow-y-auto">
-                        {filteredOptions.length > 0 ? (
-                            filteredOptions.map((item) => (
+                        {displayOptions.length > 0 ? (
+                            displayOptions.map((item) => (
                                 <div
                                     key={item.id}
                                     className="flex items-center p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
@@ -142,7 +176,7 @@ export default function ClothingSelect({ options, value, onChange, placeholder =
                             ))
                         ) : (
                             <div className="p-4 text-center text-gray-500 text-sm">
-                                Nenhum item encontrado
+                                {searchTerm.trim().length >= 2 ? 'Nenhum item encontrado' : 'Digite para buscar...'}
                             </div>
                         )}
                     </div>
