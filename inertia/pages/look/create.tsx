@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import Navbar from '../../components/components/ui/navbar'
-import { Button } from '../../components/components/ui/button'
-import ClothingSelect from '../../components/components/ui/clothing-select'
 import ColorHarmonyAnalyzer from '../../components/components/ui/color-harmony-analyzer'
 import type { Clothing } from '../../types/clothing'
 import { Shirt, User, GripVertical, Footprints, Shuffle } from 'lucide-react'
+import ClothingSelect from '~/components/components/ui/clothing-select'
+import apiConfig from '../../../config/api'
 
 const PARTS = [
     { key: 'head', label: 'Cabeça', type: 'chapéu', icon: <User size={40} strokeWidth={1.5} /> },
@@ -17,6 +17,9 @@ export default function LookCreate() {
     const [options, setOptions] = useState<Record<string, Clothing[]>>({})
     const [selected, setSelected] = useState<Record<string, Clothing | null>>({})
     const [loading, setLoading] = useState(true)
+    const [suggestions, setSuggestions] = useState<any | null>(null)
+    const [suggestionsLoading, setSuggestionsLoading] = useState(false)
+    const [lastSuggestedPart, setLastSuggestedPart] = useState<string | null>(null)
 
     useEffect(() => {
         fetch('/look/options')
@@ -31,9 +34,62 @@ export default function LookCreate() {
             })
     }, [])
 
+    useEffect(() => {
+        // Limpa sugestões se nenhuma peça estiver selecionada
+        const hasAnySelected = Object.values(selected).some(item => item !== null)
+        if (!hasAnySelected) {
+            setSuggestions(null)
+            return
+        }
+        // Busca sugestões para a primeira peça selecionada
+        const firstSelectedPart = PARTS.find(part => selected[part.key])
+        if (firstSelectedPart && selected[firstSelectedPart.key]) {
+            fetchSuggestionsForPart(firstSelectedPart.key, selected[firstSelectedPart.key])
+        } else {
+            setSuggestions(null)
+        }
+    }, [selected])
+
+    async function fetchSuggestionsForPart(partKey: string, clothing: Clothing | null) {
+        if (!clothing) return
+        setSuggestionsLoading(true)
+        setLastSuggestedPart(partKey)
+        try {
+            const payload = {
+                selected_items: [
+                    {
+                        prompt: clothing.type, // ou clothing.prompt se existir
+                        body_region: partKey,
+                        name: clothing.name,
+                        probability: 0.95, // valor fixo, pois não temos probabilidade real
+                        color: clothing.color,
+                    },
+                ],
+                top_k: 3,
+            }
+            const res = await fetch(`${apiConfig.outfitAnalysis.baseUrl}/api/v1/clothing/outfit-suggestions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            })
+            console.log(payload)
+            if (!res.ok) throw new Error('Erro ao buscar sugestões')
+            const data = await res.json()
+            setSuggestions(data)
+        } catch (err) {
+            setSuggestions(null)
+        } finally {
+            setSuggestionsLoading(false)
+        }
+    }
+
     function handleSelect(partKey: string, clothingId: string) {
         const clothing = options[PARTS.find(p => p.key === partKey)!.type]?.find(c => String(c.id) === clothingId) || null
         setSelected(sel => ({ ...sel, [partKey]: clothing }))
+        console.log("aaaaa")
+        if (clothing) {
+            fetchSuggestionsForPart(partKey, clothing)
+        }
     }
 
     function handleRandomLook() {
@@ -48,6 +104,7 @@ export default function LookCreate() {
             }
         })
         setSelected(newSelected)
+        // Não buscar sugestões aqui
     }
 
     function handleClear() {
@@ -139,6 +196,45 @@ export default function LookCreate() {
                                 <div>
                                     <h2 className="text-xl font-semibold text-gray-800 mb-6">Análise de Harmonia</h2>
                                     <ColorHarmonyAnalyzer colors={selectedColors} />
+
+                                    {/* Sugestões de Outfit */}
+                                    <div className="mt-8">
+                                        <h2 className="text-xl font-semibold text-gray-800 mb-4">Sugestões de Peças para o Look</h2>
+                                        {suggestionsLoading && (
+                                            <div className="text-gray-500">Buscando sugestões...</div>
+                                        )}
+                                        {!suggestionsLoading && suggestions && (
+                                            <div className="space-y-4">
+                                                {suggestions.suggestions && suggestions.suggestions.suggestions && Object.entries(suggestions.suggestions.suggestions).map(([region, items]) => {
+                                                    const itemsArray = Array.isArray(items) ? items as any[] : [];
+                                                    return (
+                                                        <div key={region} className="bg-white rounded-lg shadow p-4">
+                                                            <h3 className="text-lg font-bold text-gray-700 mb-2">{region === 'legs' ? 'Pernas' : region === 'feet' ? 'Pés' : region}</h3>
+                                                            <ul className="space-y-2">
+                                                                {itemsArray.map((item, idx) => (
+                                                                    <li key={idx} className="flex flex-col gap-1">
+                                                                        <span className="font-medium text-gray-800">{item.name} <span className="text-xs text-gray-500">({item.prompt})</span></span>
+                                                                        <span className="text-sm text-gray-600 flex items-center gap-1">Cores compatíveis:
+                                                                            {(item.compatible_colors ?? []).map((c: any, i: number) => (
+                                                                                <span
+                                                                                    key={i}
+                                                                                    title={c.color}
+                                                                                    style={{ backgroundColor: c.color, display: 'inline-block', width: 16, height: 16, borderRadius: '50%', border: '1px solid #ccc', marginRight: 4 }}
+                                                                                />
+                                                                            ))}
+                                                                        </span>
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                        {!suggestionsLoading && !suggestions && lastSuggestedPart && (
+                                            <div className="text-gray-500">Nenhuma sugestão encontrada.</div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
