@@ -7,6 +7,8 @@ import CustomTextarea from '../../components/components/ui/custom-textarea'
 import CustomSelect from '../../components/components/ui/custom-select'
 import SizeSelect from '../../components/components/ui/size-select'
 import ColorPicker from '../../components/components/ui/color-picker'
+import OutfitRatingCard from '../../components/components/ui/outfit-rating-card'
+import StyleAnalysisCard from '../../components/components/ui/style-analysis-card'
 import SuccessModal from '../../components/components/ui/success-modal'
 import Navbar from '../../components/components/ui/navbar'
 import { useCsrf } from '../../hooks/use-csrf'
@@ -27,6 +29,138 @@ interface BodyPartData {
         percentage: string
     }
     detectedName: string
+    detectedType: string
+}
+
+// Novas interfaces para compatibilidade de outfit
+interface OutfitRating {
+    level: string
+    emoji: string
+    description: string
+}
+
+interface DetectedPart {
+    category: number
+    name: string
+    prompt: string
+    bodyRegion: string
+    probability: number
+    percentage: string
+}
+
+interface PairwiseCompatibility {
+    part1: {
+        region: string
+        name: string
+        prompt: string
+    }
+    part2: {
+        region: string
+        name: string
+        prompt: string
+    }
+    similarity: number
+    compatibilityLevel: string
+}
+
+interface OutfitCompatibility {
+    compatibilityScore: number
+    outfitRating: OutfitRating
+    detectedParts: {
+        torso: DetectedPart
+        legs: DetectedPart
+        feet: DetectedPart
+    }
+    pairwiseCompatibility: {
+        torsoVsLegs: PairwiseCompatibility
+        torsoVsFeet: PairwiseCompatibility
+        legsVsFeet: PairwiseCompatibility
+    }
+    suggestions: string[]
+    totalComparisons: number
+}
+
+// Novas interfaces para análise completa de outfit
+interface OverallRating {
+    level: string
+    emoji: string
+    description: string
+    coordinationScore: number
+    dominantStyle: string
+    styleConfidence: number
+}
+
+interface StyleAnalysis {
+    dominantStyle: string
+    styleConfidence: number
+    allStyleScores: {
+        formal: number
+        casual: number
+        elegant: number
+        trendy: number
+        classic: number
+        modern: number
+    }
+}
+
+interface CoordinationAnalysis {
+    coordinationScore: number
+    allCoordinationScores: {
+        well_coordinated: number
+        color_coordinated: number
+        matching: number
+        harmonious: number
+        balanced: number
+        cohesive: number
+    }
+}
+
+interface DetailedScores {
+    "well coordinated outfit": number
+    "stylish outfit": number
+    "fashionable outfit": number
+    "elegant outfit": number
+    "casual outfit": number
+    "formal outfit": number
+    "professional outfit": number
+    "trendy outfit": number
+    "classic outfit": number
+    "modern outfit": number
+    "color coordinated outfit": number
+    "matching outfit": number
+    "harmonious outfit": number
+    "balanced outfit": number
+    "cohesive outfit": number
+}
+
+interface FullImageAnalysis {
+    overallRating: OverallRating
+    styleAnalysis: StyleAnalysis
+    coordinationAnalysis: CoordinationAnalysis
+    detailedScores: DetailedScores
+    insights: string[]
+}
+
+interface IndividualPartsAnalysis {
+    compatibilityScore: number
+    outfitRating: OutfitRating
+    detectedParts: {
+        torso: DetectedPart
+        legs: DetectedPart
+        feet: DetectedPart
+    }
+    pairwiseCompatibility: {
+        torsoVsLegs: PairwiseCompatibility
+        torsoVsFeet: PairwiseCompatibility
+        legsVsFeet: PairwiseCompatibility
+    }
+    suggestions: string[]
+    totalComparisons: number
+}
+
+interface CompleteOutfitAnalysis {
+    fullImageAnalysis: FullImageAnalysis
+    individualPartsAnalysis: IndividualPartsAnalysis
 }
 
 interface AnalysisData {
@@ -37,6 +171,8 @@ interface AnalysisData {
         legs: BodyPartData
         feet: BodyPartData
     }
+    outfitCompatibility?: OutfitCompatibility // Campo legado
+    completeOutfitAnalysis?: CompleteOutfitAnalysis // Novo campo
 }
 
 interface ClothingFormData {
@@ -62,7 +198,7 @@ export default function OutfitAnalysisShow({ analysisData }: { analysisData: Ana
         torso: {
             name: analysisData.bodyParts.torso.detectedName,
             description: '',
-            type: 'camiseta',
+            type: analysisData.bodyParts.torso.detectedType,
             color: '',
             size: 'M',
             image: analysisData.bodyParts.torso.image,
@@ -71,7 +207,7 @@ export default function OutfitAnalysisShow({ analysisData }: { analysisData: Ana
         legs: {
             name: analysisData.bodyParts.legs.detectedName,
             description: '',
-            type: 'calça',
+            type: analysisData.bodyParts.legs.detectedType,
             color: '',
             size: 'M',
             image: analysisData.bodyParts.legs.image,
@@ -80,7 +216,7 @@ export default function OutfitAnalysisShow({ analysisData }: { analysisData: Ana
         feet: {
             name: analysisData.bodyParts.feet.detectedName,
             description: '',
-            type: 'tênis',
+            type: analysisData.bodyParts.feet.detectedType,
             color: '',
             size: 'M',
             image: analysisData.bodyParts.feet.image,
@@ -204,31 +340,49 @@ export default function OutfitAnalysisShow({ analysisData }: { analysisData: Ana
     }
 
     const getTypeOptions = (partKey: string) => {
+        // Lista completa de tipos de roupa
+        const allTypes = [
+            { value: 'camiseta', label: 'Camiseta' },
+            { value: 'calça', label: 'Calça' },
+            { value: 'shorts', label: 'Shorts' },
+            { value: 'jaqueta', label: 'Jaqueta' },
+            { value: 'blusa', label: 'Blusa' },
+            { value: 'saia', label: 'Saia' },
+            { value: 'suéter', label: 'Suéter' },
+            { value: 'moletom', label: 'Moletom' },
+            { value: 'casaco', label: 'Casaco' },
+            { value: 'terno', label: 'Terno' },
+            { value: 'maiô', label: 'Maiô' },
+            { value: 'roupa íntima', label: 'Roupa Íntima' },
+            { value: 'meias', label: 'Meias' },
+            { value: 'sapatos', label: 'Sapatos' },
+            { value: 'botas', label: 'Botas' },
+            { value: 'sandálias', label: 'Sandálias' },
+            { value: 'chapéu', label: 'Chapéu' },
+            { value: 'boné', label: 'Boné' },
+            { value: 'cachecol', label: 'Cachecol' },
+            { value: 'luvas', label: 'Luvas' },
+            { value: 'cinto', label: 'Cinto' },
+            { value: 'bolsa', label: 'Bolsa' },
+            { value: 'mochila', label: 'Mochila' },
+        ]
+
+        // Filtros específicos por parte do corpo (opcional)
         switch (partKey) {
             case 'torso':
-                return [
-                    { value: 'camiseta', label: 'Camiseta' },
-                    { value: 'camisa', label: 'Camisa' },
-                    { value: 'suéter', label: 'Suéter' },
-                    { value: 'jaqueta', label: 'Jaqueta' },
-                    { value: 'casaco', label: 'Casaco' }
-                ]
+                return allTypes.filter(type =>
+                    ['camiseta', 'blusa', 'suéter', 'moletom', 'jaqueta', 'casaco', 'terno', 'maiô', 'roupa íntima'].includes(type.value)
+                )
             case 'legs':
-                return [
-                    { value: 'calça', label: 'Calça' },
-                    { value: 'shorts', label: 'Shorts' },
-                    { value: 'saia', label: 'Saia' },
-                    { value: 'bermuda', label: 'Bermuda' }
-                ]
+                return allTypes.filter(type =>
+                    ['calça', 'shorts', 'saia', 'meias'].includes(type.value)
+                )
             case 'feet':
-                return [
-                    { value: 'tênis', label: 'Tênis' },
-                    { value: 'sapato', label: 'Sapato' },
-                    { value: 'sandália', label: 'Sandália' },
-                    { value: 'bota', label: 'Bota' }
-                ]
+                return allTypes.filter(type =>
+                    ['sapatos', 'botas', 'sandálias'].includes(type.value)
+                )
             default:
-                return []
+                return allTypes
         }
     }
 
@@ -271,6 +425,27 @@ export default function OutfitAnalysisShow({ analysisData }: { analysisData: Ana
                             </div>
                         </CardContent>
                     </Card>
+
+                    {/* Análise de Estilo e Insights */}
+                    {analysisData.completeOutfitAnalysis && (
+                        <div className="mb-8">
+                            <StyleAnalysisCard fullImageAnalysis={analysisData.completeOutfitAnalysis.fullImageAnalysis} />
+                        </div>
+                    )}
+
+                    {/* Avaliação do Outfit */}
+                    {analysisData.outfitCompatibility && (
+                        <div className="mb-8">
+                            <OutfitRatingCard outfitCompatibility={analysisData.outfitCompatibility} />
+                        </div>
+                    )}
+
+                    {/* Avaliação do Outfit (nova API) */}
+                    {analysisData.completeOutfitAnalysis && (
+                        <div className="mb-8">
+                            <OutfitRatingCard outfitCompatibility={analysisData.completeOutfitAnalysis.individualPartsAnalysis} />
+                        </div>
+                    )}
 
                     {/* Partes do Corpo Detectadas */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

@@ -47,7 +47,12 @@ export default class ClothingController {
     const data: any = request.only(['name', 'description', 'type', 'color', 'size'])
     console.log('Extracted data:', data)
 
-    const allowedTypes = ['chapéu', 'camiseta', 'calça', 'tênis']
+    const allowedTypes = [
+      'camiseta', 'calça', 'shorts', 'jaqueta', 'blusa', 'saia', 'suéter',
+      'moletom', 'casaco', 'terno', 'maiô', 'roupa íntima', 'meias',
+      'sapatos', 'botas', 'sandálias', 'chapéu', 'boné', 'cachecol',
+      'luvas', 'cinto', 'bolsa', 'mochila'
+    ]
     if (!allowedTypes.includes(data.type)) {
       console.log('Invalid type:', data.type)
       return response.badRequest('Tipo de roupa inválido.')

@@ -23,6 +23,8 @@ export default function ColorPicker({
     const [pickedColor, setPickedColor] = useState<string | null>(null)
     const [dominantColors, setDominantColors] = useState<string[]>([])
     const [isExtractingColors, setIsExtractingColors] = useState(false)
+    const [backgroundSensitivity, setBackgroundSensitivity] = useState(50) // 0-100
+    const [showAdvancedOptions, setShowAdvancedOptions] = useState(false)
 
     useEffect(() => {
         if (imageUrl && imageRef.current) {
@@ -118,17 +120,29 @@ export default function ColorPicker({
             const data = imageData.data
             console.log('ColorPicker: Got image data, processing', data.length / 4, 'pixels')
 
-            // Simple color extraction without background removal for now
+            // Background detection and removal
+            const { foregroundPixels, backgroundColor } = detectAndRemoveBackground(data, canvas.width, canvas.height)
+
+            // Extract colors only from foreground (clothing)
             const colorMap = new Map<string, number>()
 
-            for (let i = 0; i < data.length; i += 4) {
+            foregroundPixels.forEach(pixelIndex => {
+                const i = pixelIndex * 4
                 const r = data[i]
                 const g = data[i + 1]
                 const b = data[i + 2]
-                const a = data[i + 3]
 
                 // Skip transparent pixels
-                if (a < 128) continue
+                if (data[i + 3] < 128) return
+
+                // Skip pixels too similar to background
+                const distanceToBackground = Math.sqrt(
+                    Math.pow(r - backgroundColor.r, 2) +
+                    Math.pow(g - backgroundColor.g, 2) +
+                    Math.pow(b - backgroundColor.b, 2)
+                )
+
+                if (distanceToBackground < 30) return // Skip if too similar to background
 
                 // Quantize colors to reduce similar colors
                 const quantizedR = Math.floor(r / 32) * 32
@@ -137,7 +151,7 @@ export default function ColorPicker({
 
                 const colorKey = `${quantizedR},${quantizedG},${quantizedB}`
                 colorMap.set(colorKey, (colorMap.get(colorKey) || 0) + 1)
-            }
+            })
 
             // Sort colors by frequency and get top 5
             const sortedColors = Array.from(colorMap.entries())
@@ -178,6 +192,71 @@ export default function ColorPicker({
         } finally {
             setIsExtractingColors(false)
         }
+    }
+
+    const detectAndRemoveBackground = (data: Uint8ClampedArray, width: number, height: number) => {
+        // Sample border pixels to detect background color
+        const borderPixels: number[][] = []
+
+        // Sample top and bottom borders
+        for (let x = 0; x < width; x += 10) {
+            // Top border
+            const topIndex = (x + 0 * width) * 4
+            borderPixels.push([data[topIndex], data[topIndex + 1], data[topIndex + 2]])
+
+            // Bottom border
+            const bottomIndex = (x + (height - 1) * width) * 4
+            borderPixels.push([data[bottomIndex], data[bottomIndex + 1], data[bottomIndex + 2]])
+        }
+
+        // Sample left and right borders
+        for (let y = 0; y < height; y += 10) {
+            // Left border
+            const leftIndex = (0 + y * width) * 4
+            borderPixels.push([data[leftIndex], data[leftIndex + 1], data[leftIndex + 2]])
+
+            // Right border
+            const rightIndex = ((width - 1) + y * width) * 4
+            borderPixels.push([data[rightIndex], data[rightIndex + 1], data[rightIndex + 2]])
+        }
+
+        // Calculate average background color
+        const avgR = Math.round(borderPixels.reduce((sum, pixel) => sum + pixel[0], 0) / borderPixels.length)
+        const avgG = Math.round(borderPixels.reduce((sum, pixel) => sum + pixel[1], 0) / borderPixels.length)
+        const avgB = Math.round(borderPixels.reduce((sum, pixel) => sum + pixel[2], 0) / borderPixels.length)
+
+        const backgroundColor = { r: avgR, g: avgG, b: avgB }
+
+        // Find foreground pixels (non-background)
+        const foregroundPixels: number[] = []
+        const tolerance = backgroundSensitivity // Use configurable sensitivity
+
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const index = (x + y * width) * 4
+                const r = data[index]
+                const g = data[index + 1]
+                const b = data[index + 2]
+                const a = data[index + 3]
+
+                // Skip transparent pixels
+                if (a < 128) continue
+
+                // Calculate distance to background color
+                const distance = Math.sqrt(
+                    Math.pow(r - backgroundColor.r, 2) +
+                    Math.pow(g - backgroundColor.g, 2) +
+                    Math.pow(b - backgroundColor.b, 2)
+                )
+
+                // If pixel is significantly different from background, it's foreground
+                if (distance > tolerance) {
+                    foregroundPixels.push(x + y * width)
+                }
+            }
+        }
+
+        return { foregroundPixels, backgroundColor }
     }
 
     const getColorFromImage = (event: React.MouseEvent<HTMLImageElement>) => {
@@ -298,15 +377,57 @@ export default function ColorPicker({
             {/* Dominant colors palette */}
             {dominantColors.length > 0 && (
                 <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                        <Palette size={14} className="text-gray-600" />
-                        <span className="text-xs font-medium text-gray-700">
-                            Cores predominantes:
-                        </span>
-                        {isExtractingColors && (
-                            <div className="text-xs text-gray-500">Extraindo...</div>
-                        )}
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Palette size={14} className="text-gray-600" />
+                            <span className="text-xs font-medium text-gray-700">
+                                Cores predominantes extraídas automaticamente:
+                            </span>
+                            {isExtractingColors && (
+                                <div className="text-xs text-gray-500">Extraindo...</div>
+                            )}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                            className="text-xs text-blue-600 hover:text-blue-800 transition-colors"
+                        >
+                            {showAdvancedOptions ? 'Ocultar' : 'Avançado'}
+                        </button>
                     </div>
+
+                    {/* Advanced options */}
+                    {showAdvancedOptions && (
+                        <div className="bg-gray-50 p-3 rounded-lg space-y-3">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                    Sensibilidade de Detecção de Fundo: {backgroundSensitivity}
+                                </label>
+                                <input
+                                    type="range"
+                                    min="10"
+                                    max="100"
+                                    value={backgroundSensitivity}
+                                    onChange={(e) => {
+                                        setBackgroundSensitivity(Number(e.target.value))
+                                        // Re-extract colors with new sensitivity
+                                        if (imageRef.current) {
+                                            extractDominantColors(imageRef.current)
+                                        }
+                                    }}
+                                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                />
+                                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                                    <span>Mais sensível</span>
+                                    <span>Menos sensível</span>
+                                </div>
+                            </div>
+                            <div className="text-xs text-gray-600">
+                                <p>• <strong>Mais sensível:</strong> Remove mais fundo, pode perder detalhes da roupa</p>
+                                <p>• <strong>Menos sensível:</strong> Mantém mais detalhes, pode incluir partes do fundo</p>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="flex gap-1.5 flex-wrap">
                         {dominantColors.map((color, index) => (
@@ -346,8 +467,8 @@ export default function ColorPicker({
             {/* Instructions */}
             <div className="text-xs text-gray-500">
                 {isPicking
-                    ? "Clique na imagem para extrair a cor do pixel selecionado"
-                    : "As cores são extraídas automaticamente. Clique em uma cor da paleta ou use o ícone da lupa para extração manual."
+                    ? "Clique na imagem para extrair a cor do pixel selecionado (cursor em forma de mira)"
+                    : "As cores predominantes são extraídas automaticamente da peça de roupa (fundo removido). Clique em uma cor da paleta, use o ícone da lupa para extração manual, ou ajuste a sensibilidade nas opções avançadas."
                 }
             </div>
 

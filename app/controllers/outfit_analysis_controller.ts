@@ -1,11 +1,45 @@
-import { HttpContext } from '@adonisjs/core/http'
+import type { HttpContext } from '@adonisjs/core/http'
 import Clothing from '#models/clothing'
 import apiConfig from '#config/api'
 import FormData from 'form-data'
 import fetch from 'node-fetch';
 
-// Cache em memória para dados de análise
+// Mapeamento de tipos de roupa baseado no campo category da API
+const CLOTHING_TYPE_MAP: { [key: number]: { name: string, value: string } } = {
+    0: { name: "Camiseta", value: "camiseta" },
+    1: { name: "Calça", value: "calça" },
+    2: { name: "Shorts", value: "shorts" },
+    3: { name: "Jaqueta", value: "jaqueta" },
+    4: { name: "Blusa", value: "blusa" },
+    5: { name: "Saia", value: "saia" },
+    6: { name: "Suéter", value: "suéter" },
+    7: { name: "Moletom", value: "moletom" },
+    8: { name: "Casaco", value: "casaco" },
+    9: { name: "Terno", value: "terno" },
+    10: { name: "Maiô", value: "maiô" },
+    11: { name: "Roupa Íntima", value: "roupa íntima" },
+    12: { name: "Meias", value: "meias" },
+    13: { name: "Sapatos", value: "sapatos" },
+    14: { name: "Botas", value: "botas" },
+    15: { name: "Sandálias", value: "sandálias" },
+    16: { name: "Chapéu", value: "chapéu" },
+    17: { name: "Boné", value: "boné" },
+    18: { name: "Cachecol", value: "cachecol" },
+    19: { name: "Luvas", value: "luvas" },
+    20: { name: "Cinto", value: "cinto" },
+    21: { name: "Bolsa", value: "bolsa" },
+    22: { name: "Mochila", value: "mochila" }
+}
+
+// Cache para armazenar dados de análise temporariamente
 const analysisCache = new Map<string, any>()
+
+/**
+ * Mapeia o número da categoria da API para o tipo de roupa
+ */
+function mapCategoryToClothingType(categoryNumber: number): { name: string, value: string } {
+    return CLOTHING_TYPE_MAP[categoryNumber] || { name: "Desconhecido", value: "desconhecido" }
+}
 
 interface BodyPartAnalysis {
     category: string
@@ -28,6 +62,137 @@ interface Classification {
     predictions: BodyPartAnalysis[]
     top_prediction: BodyPartAnalysis
     url: string
+}
+
+// Novas interfaces para compatibilidade de outfit
+interface OutfitRating {
+    level: string
+    emoji: string
+    description: string
+}
+
+interface DetectedPart {
+    category: number
+    name: string
+    prompt: string
+    body_region: string
+    probability: number
+    percentage: string
+}
+
+interface PairwiseCompatibility {
+    part1: {
+        region: string
+        name: string
+        prompt: string
+    }
+    part2: {
+        region: string
+        name: string
+        prompt: string
+    }
+    similarity: number
+    compatibility_level: string
+}
+
+interface OutfitCompatibility {
+    compatibility_score: number
+    outfit_rating: OutfitRating
+    detected_parts: {
+        torso: DetectedPart
+        legs: DetectedPart
+        feet: DetectedPart
+    }
+    pairwise_compatibility: {
+        torso_vs_legs: PairwiseCompatibility
+        torso_vs_feet: PairwiseCompatibility
+        legs_vs_feet: PairwiseCompatibility
+    }
+    suggestions: string[]
+    total_comparisons: number
+}
+
+// Novas interfaces para análise completa de outfit
+interface OverallRating {
+    level: string
+    emoji: string
+    description: string
+    coordination_score: number
+    dominant_style: string
+    style_confidence: number
+}
+
+interface StyleAnalysis {
+    dominant_style: string
+    style_confidence: number
+    all_style_scores: {
+        formal: number
+        casual: number
+        elegant: number
+        trendy: number
+        classic: number
+        modern: number
+    }
+}
+
+interface CoordinationAnalysis {
+    coordination_score: number
+    all_coordination_scores: {
+        well_coordinated: number
+        color_coordinated: number
+        matching: number
+        harmonious: number
+        balanced: number
+        cohesive: number
+    }
+}
+
+interface DetailedScores {
+    "well coordinated outfit": number
+    "stylish outfit": number
+    "fashionable outfit": number
+    "elegant outfit": number
+    "casual outfit": number
+    "formal outfit": number
+    "professional outfit": number
+    "trendy outfit": number
+    "classic outfit": number
+    "modern outfit": number
+    "color coordinated outfit": number
+    "matching outfit": number
+    "harmonious outfit": number
+    "balanced outfit": number
+    "cohesive outfit": number
+}
+
+interface FullImageAnalysis {
+    overall_rating: OverallRating
+    style_analysis: StyleAnalysis
+    coordination_analysis: CoordinationAnalysis
+    detailed_scores: DetailedScores
+    insights: string[]
+}
+
+interface IndividualPartsAnalysis {
+    compatibility_score: number
+    outfit_rating: OutfitRating
+    detected_parts: {
+        torso: DetectedPart
+        legs: DetectedPart
+        feet: DetectedPart
+    }
+    pairwise_compatibility: {
+        torso_vs_legs: PairwiseCompatibility
+        torso_vs_feet: PairwiseCompatibility
+        legs_vs_feet: PairwiseCompatibility
+    }
+    suggestions: string[]
+    total_comparisons: number
+}
+
+interface CompleteOutfitAnalysis {
+    full_image_analysis: FullImageAnalysis
+    individual_parts_analysis: IndividualPartsAnalysis
 }
 
 interface ApiResponse {
@@ -59,6 +224,8 @@ interface ApiResponse {
         total_parts_classified: number
         people_detected: number
     }
+    outfit_compatibility?: OutfitCompatibility // Campo legado
+    complete_outfit_analysis?: CompleteOutfitAnalysis // Novo campo
 }
 
 export default class OutfitAnalysisController {
@@ -72,7 +239,7 @@ export default class OutfitAnalysisController {
     /**
      * Handle image upload and analysis
      */
-    async store({ request, response, inertia }: HttpContext) {
+    async store({ request, response }: HttpContext) {
         const imageFile = request.file('fullBodyImage')
 
         if (!imageFile || !imageFile.isValid) {
@@ -190,7 +357,9 @@ export default class OutfitAnalysisController {
                         name: 'Suéter',
                         probability: 0.91,
                         percentage: '91.33%'
-                    }
+                    },
+                    detectedName: 'Suéter',
+                    detectedType: 'suéter'
                 },
                 legs: {
                     image: '/defaults/clothing.png',
@@ -199,7 +368,9 @@ export default class OutfitAnalysisController {
                         name: 'Calça',
                         probability: 0.74,
                         percentage: '73.62%'
-                    }
+                    },
+                    detectedName: 'Calça',
+                    detectedType: 'calça'
                 },
                 feet: {
                     image: '/defaults/clothing.png',
@@ -208,7 +379,234 @@ export default class OutfitAnalysisController {
                         name: 'Sapatos',
                         probability: 0.64,
                         percentage: '64.42%'
+                    },
+                    detectedName: 'Sapatos',
+                    detectedType: 'sapatos'
+                }
+            },
+            // Dados de compatibilidade simulados (legado)
+            outfitCompatibility: {
+                compatibilityScore: 0.829,
+                outfitRating: {
+                    level: 'Excelente',
+                    emoji: '🌟',
+                    description: 'Outfit muito bem combinado! As peças harmonizam perfeitamente.'
+                },
+                detectedParts: {
+                    torso: {
+                        category: 6,
+                        name: 'Suéter',
+                        prompt: 'sweater',
+                        bodyRegion: 'torso',
+                        probability: 0.91,
+                        percentage: '91.33%'
+                    },
+                    legs: {
+                        category: 1,
+                        name: 'Calça',
+                        prompt: 'pants',
+                        bodyRegion: 'legs',
+                        probability: 0.74,
+                        percentage: '73.62%'
+                    },
+                    feet: {
+                        category: 13,
+                        name: 'Sapatos',
+                        prompt: 'shoes',
+                        bodyRegion: 'feet',
+                        probability: 0.64,
+                        percentage: '64.42%'
                     }
+                },
+                pairwiseCompatibility: {
+                    torsoVsLegs: {
+                        part1: {
+                            region: 'torso',
+                            name: 'Suéter',
+                            prompt: 'sweater'
+                        },
+                        part2: {
+                            region: 'legs',
+                            name: 'Calça',
+                            prompt: 'pants'
+                        },
+                        similarity: 0.826,
+                        compatibilityLevel: 'Excelente'
+                    },
+                    torsoVsFeet: {
+                        part1: {
+                            region: 'torso',
+                            name: 'Suéter',
+                            prompt: 'sweater'
+                        },
+                        part2: {
+                            region: 'feet',
+                            name: 'Sapatos',
+                            prompt: 'shoes'
+                        },
+                        similarity: 0.799,
+                        compatibilityLevel: 'Boa'
+                    },
+                    legsVsFeet: {
+                        part1: {
+                            region: 'legs',
+                            name: 'Calça',
+                            prompt: 'pants'
+                        },
+                        part2: {
+                            region: 'feet',
+                            name: 'Sapatos',
+                            prompt: 'shoes'
+                        },
+                        similarity: 0.862,
+                        compatibilityLevel: 'Excelente'
+                    }
+                },
+                suggestions: [
+                    'O outfit está completo! Considere acessórios para complementar',
+                    'As cores combinam muito bem entre si',
+                    'Perfeito para ocasiões casuais e elegantes'
+                ],
+                totalComparisons: 3
+            },
+            // Novos dados de análise completa simulados
+            completeOutfitAnalysis: {
+                fullImageAnalysis: {
+                    overallRating: {
+                        level: 'Baixo',
+                        emoji: '⚠️',
+                        description: 'Outfit formal com baixa coordenação. Considere trocar algumas peças.',
+                        coordinationScore: 0.078,
+                        dominantStyle: 'formal',
+                        styleConfidence: 0.114
+                    },
+                    styleAnalysis: {
+                        dominantStyle: 'formal',
+                        styleConfidence: 0.114,
+                        allStyleScores: {
+                            formal: 0.114,
+                            casual: 0.034,
+                            elegant: 0.034,
+                            trendy: 0.065,
+                            classic: 0.023,
+                            modern: 0.095
+                        }
+                    },
+                    coordinationAnalysis: {
+                        coordinationScore: 0.078,
+                        allCoordinationScores: {
+                            well_coordinated: 0.002,
+                            color_coordinated: 0.024,
+                            matching: 0.001,
+                            harmonious: 0.222,
+                            balanced: 0.018,
+                            cohesive: 0.203
+                        }
+                    },
+                    detailedScores: {
+                        "well coordinated outfit": 0.002,
+                        "stylish outfit": 0.027,
+                        "fashionable outfit": 0.023,
+                        "elegant outfit": 0.034,
+                        "casual outfit": 0.034,
+                        "formal outfit": 0.037,
+                        "professional outfit": 0.191,
+                        "trendy outfit": 0.065,
+                        "classic outfit": 0.023,
+                        "modern outfit": 0.095,
+                        "color coordinated outfit": 0.024,
+                        "matching outfit": 0.001,
+                        "harmonious outfit": 0.222,
+                        "balanced outfit": 0.018,
+                        "cohesive outfit": 0.203
+                    },
+                    insights: [
+                        "As peças precisam de melhor coordenação",
+                        "Considere melhorar a combinação de cores"
+                    ]
+                },
+                individualPartsAnalysis: {
+                    compatibilityScore: 0.795,
+                    outfitRating: {
+                        level: 'Bom',
+                        emoji: '👍',
+                        description: 'Outfit bem combinado. As peças funcionam bem juntas.'
+                    },
+                    detectedParts: {
+                        torso: {
+                            category: 4,
+                            name: 'Blusa',
+                            prompt: 'blouse',
+                            bodyRegion: 'torso',
+                            probability: 0.575,
+                            percentage: '57.50%'
+                        },
+                        legs: {
+                            category: 1,
+                            name: 'Calça',
+                            prompt: 'pants',
+                            bodyRegion: 'legs',
+                            probability: 0.249,
+                            percentage: '24.93%'
+                        },
+                        feet: {
+                            category: 15,
+                            name: 'Sandálias',
+                            prompt: 'sandals',
+                            bodyRegion: 'feet',
+                            probability: 0.813,
+                            percentage: '81.26%'
+                        }
+                    },
+                    pairwiseCompatibility: {
+                        torsoVsLegs: {
+                            part1: {
+                                region: 'torso',
+                                name: 'Blusa',
+                                prompt: 'blouse'
+                            },
+                            part2: {
+                                region: 'legs',
+                                name: 'Calça',
+                                prompt: 'pants'
+                            },
+                            similarity: 0.806,
+                            compatibilityLevel: 'Excelente'
+                        },
+                        torsoVsFeet: {
+                            part1: {
+                                region: 'torso',
+                                name: 'Blusa',
+                                prompt: 'blouse'
+                            },
+                            part2: {
+                                region: 'feet',
+                                name: 'Sandálias',
+                                prompt: 'sandals'
+                            },
+                            similarity: 0.743,
+                            compatibilityLevel: 'Boa'
+                        },
+                        legsVsFeet: {
+                            part1: {
+                                region: 'legs',
+                                name: 'Calça',
+                                prompt: 'pants'
+                            },
+                            part2: {
+                                region: 'feet',
+                                name: 'Sandálias',
+                                prompt: 'sandals'
+                            },
+                            similarity: 0.836,
+                            compatibilityLevel: 'Excelente'
+                        }
+                    },
+                    suggestions: [
+                        'Um Bolsa pode complementar o outfit',
+                        'Um Mochila pode complementar o outfit'
+                    ],
+                    totalComparisons: 3
                 }
             }
         }
@@ -424,6 +822,199 @@ export default class OutfitAnalysisController {
     private transformApiResponse(apiData: ApiResponse, originalImage: string) {
         const baseUrl = apiConfig.outfitAnalysis.baseUrl
 
+        // Processar dados de compatibilidade (legado ou novo)
+        let outfitCompatibility = null
+        let completeOutfitAnalysis = null
+
+        if (apiData.complete_outfit_analysis) {
+            // Usar dados da nova API
+            completeOutfitAnalysis = {
+                fullImageAnalysis: {
+                    overallRating: {
+                        level: apiData.complete_outfit_analysis.full_image_analysis.overall_rating.level,
+                        emoji: apiData.complete_outfit_analysis.full_image_analysis.overall_rating.emoji,
+                        description: apiData.complete_outfit_analysis.full_image_analysis.overall_rating.description,
+                        coordinationScore: apiData.complete_outfit_analysis.full_image_analysis.overall_rating.coordination_score,
+                        dominantStyle: apiData.complete_outfit_analysis.full_image_analysis.overall_rating.dominant_style,
+                        styleConfidence: apiData.complete_outfit_analysis.full_image_analysis.overall_rating.style_confidence
+                    },
+                    styleAnalysis: {
+                        dominantStyle: apiData.complete_outfit_analysis.full_image_analysis.style_analysis.dominant_style,
+                        styleConfidence: apiData.complete_outfit_analysis.full_image_analysis.style_analysis.style_confidence,
+                        allStyleScores: apiData.complete_outfit_analysis.full_image_analysis.style_analysis.all_style_scores
+                    },
+                    coordinationAnalysis: {
+                        coordinationScore: apiData.complete_outfit_analysis.full_image_analysis.coordination_analysis.coordination_score,
+                        allCoordinationScores: apiData.complete_outfit_analysis.full_image_analysis.coordination_analysis.all_coordination_scores
+                    },
+                    detailedScores: apiData.complete_outfit_analysis.full_image_analysis.detailed_scores,
+                    insights: apiData.complete_outfit_analysis.full_image_analysis.insights
+                },
+                individualPartsAnalysis: {
+                    compatibilityScore: apiData.complete_outfit_analysis.individual_parts_analysis.compatibility_score,
+                    outfitRating: {
+                        level: apiData.complete_outfit_analysis.individual_parts_analysis.outfit_rating.level,
+                        emoji: apiData.complete_outfit_analysis.individual_parts_analysis.outfit_rating.emoji,
+                        description: apiData.complete_outfit_analysis.individual_parts_analysis.outfit_rating.description
+                    },
+                    detectedParts: {
+                        torso: {
+                            category: apiData.complete_outfit_analysis.individual_parts_analysis.detected_parts.torso.category,
+                            name: apiData.complete_outfit_analysis.individual_parts_analysis.detected_parts.torso.name,
+                            prompt: apiData.complete_outfit_analysis.individual_parts_analysis.detected_parts.torso.prompt,
+                            bodyRegion: apiData.complete_outfit_analysis.individual_parts_analysis.detected_parts.torso.body_region,
+                            probability: apiData.complete_outfit_analysis.individual_parts_analysis.detected_parts.torso.probability,
+                            percentage: apiData.complete_outfit_analysis.individual_parts_analysis.detected_parts.torso.percentage
+                        },
+                        legs: {
+                            category: apiData.complete_outfit_analysis.individual_parts_analysis.detected_parts.legs.category,
+                            name: apiData.complete_outfit_analysis.individual_parts_analysis.detected_parts.legs.name,
+                            prompt: apiData.complete_outfit_analysis.individual_parts_analysis.detected_parts.legs.prompt,
+                            bodyRegion: apiData.complete_outfit_analysis.individual_parts_analysis.detected_parts.legs.body_region,
+                            probability: apiData.complete_outfit_analysis.individual_parts_analysis.detected_parts.legs.probability,
+                            percentage: apiData.complete_outfit_analysis.individual_parts_analysis.detected_parts.legs.percentage
+                        },
+                        feet: {
+                            category: apiData.complete_outfit_analysis.individual_parts_analysis.detected_parts.feet.category,
+                            name: apiData.complete_outfit_analysis.individual_parts_analysis.detected_parts.feet.name,
+                            prompt: apiData.complete_outfit_analysis.individual_parts_analysis.detected_parts.feet.prompt,
+                            bodyRegion: apiData.complete_outfit_analysis.individual_parts_analysis.detected_parts.feet.body_region,
+                            probability: apiData.complete_outfit_analysis.individual_parts_analysis.detected_parts.feet.probability,
+                            percentage: apiData.complete_outfit_analysis.individual_parts_analysis.detected_parts.feet.percentage
+                        }
+                    },
+                    pairwiseCompatibility: {
+                        torsoVsLegs: {
+                            part1: {
+                                region: apiData.complete_outfit_analysis.individual_parts_analysis.pairwise_compatibility.torso_vs_legs.part1.region,
+                                name: apiData.complete_outfit_analysis.individual_parts_analysis.pairwise_compatibility.torso_vs_legs.part1.name,
+                                prompt: apiData.complete_outfit_analysis.individual_parts_analysis.pairwise_compatibility.torso_vs_legs.part1.prompt
+                            },
+                            part2: {
+                                region: apiData.complete_outfit_analysis.individual_parts_analysis.pairwise_compatibility.torso_vs_legs.part2.region,
+                                name: apiData.complete_outfit_analysis.individual_parts_analysis.pairwise_compatibility.torso_vs_legs.part2.name,
+                                prompt: apiData.complete_outfit_analysis.individual_parts_analysis.pairwise_compatibility.torso_vs_legs.part2.prompt
+                            },
+                            similarity: apiData.complete_outfit_analysis.individual_parts_analysis.pairwise_compatibility.torso_vs_legs.similarity,
+                            compatibilityLevel: apiData.complete_outfit_analysis.individual_parts_analysis.pairwise_compatibility.torso_vs_legs.compatibility_level
+                        },
+                        torsoVsFeet: {
+                            part1: {
+                                region: apiData.complete_outfit_analysis.individual_parts_analysis.pairwise_compatibility.torso_vs_feet.part1.region,
+                                name: apiData.complete_outfit_analysis.individual_parts_analysis.pairwise_compatibility.torso_vs_feet.part1.name,
+                                prompt: apiData.complete_outfit_analysis.individual_parts_analysis.pairwise_compatibility.torso_vs_feet.part1.prompt
+                            },
+                            part2: {
+                                region: apiData.complete_outfit_analysis.individual_parts_analysis.pairwise_compatibility.torso_vs_feet.part2.region,
+                                name: apiData.complete_outfit_analysis.individual_parts_analysis.pairwise_compatibility.torso_vs_feet.part2.name,
+                                prompt: apiData.complete_outfit_analysis.individual_parts_analysis.pairwise_compatibility.torso_vs_feet.part2.prompt
+                            },
+                            similarity: apiData.complete_outfit_analysis.individual_parts_analysis.pairwise_compatibility.torso_vs_feet.similarity,
+                            compatibilityLevel: apiData.complete_outfit_analysis.individual_parts_analysis.pairwise_compatibility.torso_vs_feet.compatibility_level
+                        },
+                        legsVsFeet: {
+                            part1: {
+                                region: apiData.complete_outfit_analysis.individual_parts_analysis.pairwise_compatibility.legs_vs_feet.part1.region,
+                                name: apiData.complete_outfit_analysis.individual_parts_analysis.pairwise_compatibility.legs_vs_feet.part1.name,
+                                prompt: apiData.complete_outfit_analysis.individual_parts_analysis.pairwise_compatibility.legs_vs_feet.part1.prompt
+                            },
+                            part2: {
+                                region: apiData.complete_outfit_analysis.individual_parts_analysis.pairwise_compatibility.legs_vs_feet.part2.region,
+                                name: apiData.complete_outfit_analysis.individual_parts_analysis.pairwise_compatibility.legs_vs_feet.part2.name,
+                                prompt: apiData.complete_outfit_analysis.individual_parts_analysis.pairwise_compatibility.legs_vs_feet.part2.prompt
+                            },
+                            similarity: apiData.complete_outfit_analysis.individual_parts_analysis.pairwise_compatibility.legs_vs_feet.similarity,
+                            compatibilityLevel: apiData.complete_outfit_analysis.individual_parts_analysis.pairwise_compatibility.legs_vs_feet.compatibility_level
+                        }
+                    },
+                    suggestions: apiData.complete_outfit_analysis.individual_parts_analysis.suggestions,
+                    totalComparisons: apiData.complete_outfit_analysis.individual_parts_analysis.total_comparisons
+                }
+            }
+        } else if (apiData.outfit_compatibility) {
+            // Usar dados legados
+            outfitCompatibility = {
+                compatibilityScore: apiData.outfit_compatibility.compatibility_score,
+                outfitRating: {
+                    level: apiData.outfit_compatibility.outfit_rating.level,
+                    emoji: apiData.outfit_compatibility.outfit_rating.emoji,
+                    description: apiData.outfit_compatibility.outfit_rating.description
+                },
+                detectedParts: {
+                    torso: {
+                        category: apiData.outfit_compatibility.detected_parts.torso.category,
+                        name: apiData.outfit_compatibility.detected_parts.torso.name,
+                        prompt: apiData.outfit_compatibility.detected_parts.torso.prompt,
+                        bodyRegion: apiData.outfit_compatibility.detected_parts.torso.body_region,
+                        probability: apiData.outfit_compatibility.detected_parts.torso.probability,
+                        percentage: apiData.outfit_compatibility.detected_parts.torso.percentage
+                    },
+                    legs: {
+                        category: apiData.outfit_compatibility.detected_parts.legs.category,
+                        name: apiData.outfit_compatibility.detected_parts.legs.name,
+                        prompt: apiData.outfit_compatibility.detected_parts.legs.prompt,
+                        bodyRegion: apiData.outfit_compatibility.detected_parts.legs.body_region,
+                        probability: apiData.outfit_compatibility.detected_parts.legs.probability,
+                        percentage: apiData.outfit_compatibility.detected_parts.legs.percentage
+                    },
+                    feet: {
+                        category: apiData.outfit_compatibility.detected_parts.feet.category,
+                        name: apiData.outfit_compatibility.detected_parts.feet.name,
+                        prompt: apiData.outfit_compatibility.detected_parts.feet.prompt,
+                        bodyRegion: apiData.outfit_compatibility.detected_parts.feet.body_region,
+                        probability: apiData.outfit_compatibility.detected_parts.feet.probability,
+                        percentage: apiData.outfit_compatibility.detected_parts.feet.percentage
+                    }
+                },
+                pairwiseCompatibility: {
+                    torsoVsLegs: {
+                        part1: {
+                            region: apiData.outfit_compatibility.pairwise_compatibility.torso_vs_legs.part1.region,
+                            name: apiData.outfit_compatibility.pairwise_compatibility.torso_vs_legs.part1.name,
+                            prompt: apiData.outfit_compatibility.pairwise_compatibility.torso_vs_legs.part1.prompt
+                        },
+                        part2: {
+                            region: apiData.outfit_compatibility.pairwise_compatibility.torso_vs_legs.part2.region,
+                            name: apiData.outfit_compatibility.pairwise_compatibility.torso_vs_legs.part2.name,
+                            prompt: apiData.outfit_compatibility.pairwise_compatibility.torso_vs_legs.part2.prompt
+                        },
+                        similarity: apiData.outfit_compatibility.pairwise_compatibility.torso_vs_legs.similarity,
+                        compatibilityLevel: apiData.outfit_compatibility.pairwise_compatibility.torso_vs_legs.compatibility_level
+                    },
+                    torsoVsFeet: {
+                        part1: {
+                            region: apiData.outfit_compatibility.pairwise_compatibility.torso_vs_feet.part1.region,
+                            name: apiData.outfit_compatibility.pairwise_compatibility.torso_vs_feet.part1.name,
+                            prompt: apiData.outfit_compatibility.pairwise_compatibility.torso_vs_feet.part1.prompt
+                        },
+                        part2: {
+                            region: apiData.outfit_compatibility.pairwise_compatibility.torso_vs_feet.part2.region,
+                            name: apiData.outfit_compatibility.pairwise_compatibility.torso_vs_feet.part2.name,
+                            prompt: apiData.outfit_compatibility.pairwise_compatibility.torso_vs_feet.part2.prompt
+                        },
+                        similarity: apiData.outfit_compatibility.pairwise_compatibility.torso_vs_feet.similarity,
+                        compatibilityLevel: apiData.outfit_compatibility.pairwise_compatibility.torso_vs_feet.compatibility_level
+                    },
+                    legsVsFeet: {
+                        part1: {
+                            region: apiData.outfit_compatibility.pairwise_compatibility.legs_vs_feet.part1.region,
+                            name: apiData.outfit_compatibility.pairwise_compatibility.legs_vs_feet.part1.name,
+                            prompt: apiData.outfit_compatibility.pairwise_compatibility.legs_vs_feet.part1.prompt
+                        },
+                        part2: {
+                            region: apiData.outfit_compatibility.pairwise_compatibility.legs_vs_feet.part2.region,
+                            name: apiData.outfit_compatibility.pairwise_compatibility.legs_vs_feet.part2.name,
+                            prompt: apiData.outfit_compatibility.pairwise_compatibility.legs_vs_feet.part2.prompt
+                        },
+                        similarity: apiData.outfit_compatibility.pairwise_compatibility.legs_vs_feet.similarity,
+                        compatibilityLevel: apiData.outfit_compatibility.pairwise_compatibility.legs_vs_feet.compatibility_level
+                    }
+                },
+                suggestions: apiData.outfit_compatibility.suggestions,
+                totalComparisons: apiData.outfit_compatibility.total_comparisons
+            }
+        }
+
         return {
             sessionId: apiData.session_id,
             originalImage,
@@ -436,7 +1027,8 @@ export default class OutfitAnalysisController {
                         probability: apiData.classifications?.torso?.top_prediction?.probability || 0,
                         percentage: apiData.classifications?.torso?.top_prediction?.percentage || '0%'
                     },
-                    detectedName: apiData.classifications?.torso?.top_prediction?.name || 'Suéter'
+                    detectedName: apiData.classifications?.torso?.top_prediction?.name || 'Suéter',
+                    detectedType: this.getDetectedType(apiData.classifications?.torso?.top_prediction?.category)
                 },
                 legs: {
                     image: apiData.saved_parts?.legs?.url ? `${baseUrl}${apiData.saved_parts.legs.url}` : '/defaults/clothing.png',
@@ -446,7 +1038,8 @@ export default class OutfitAnalysisController {
                         probability: apiData.classifications?.legs?.top_prediction?.probability || 0,
                         percentage: apiData.classifications?.legs?.top_prediction?.percentage || '0%'
                     },
-                    detectedName: apiData.classifications?.legs?.top_prediction?.name || 'Calça'
+                    detectedName: apiData.classifications?.legs?.top_prediction?.name || 'Calça',
+                    detectedType: this.getDetectedType(apiData.classifications?.legs?.top_prediction?.category)
                 },
                 feet: {
                     image: apiData.saved_parts?.feet?.url ? `${baseUrl}${apiData.saved_parts.feet.url}` : '/defaults/clothing.png',
@@ -456,9 +1049,60 @@ export default class OutfitAnalysisController {
                         probability: apiData.classifications?.feet?.top_prediction?.probability || 0,
                         percentage: apiData.classifications?.feet?.top_prediction?.percentage || '0%'
                     },
-                    detectedName: apiData.classifications?.feet?.top_prediction?.name || 'Sapatos'
+                    detectedName: apiData.classifications?.feet?.top_prediction?.name || 'Sapatos',
+                    detectedType: this.getDetectedType(apiData.classifications?.feet?.top_prediction?.category)
                 }
-            }
+            },
+            // Dados de compatibilidade (legado)
+            outfitCompatibility,
+            // Novos dados de análise completa
+            completeOutfitAnalysis
         }
+    }
+
+    /**
+     * Obtém o tipo de roupa baseado na categoria da API
+     */
+    private getDetectedType(category: string | undefined): string {
+        if (!category) return 'desconhecido'
+
+        // Se a categoria for um número, mapeia diretamente
+        const categoryNumber = parseInt(category)
+        if (!isNaN(categoryNumber)) {
+            return mapCategoryToClothingType(categoryNumber).value
+        }
+
+        // Se for uma string, tenta mapear baseado no nome
+        const categoryLower = category.toLowerCase()
+
+        // Mapeamento de fallback para categorias em texto
+        const categoryMap: { [key: string]: string } = {
+            'sweater': 'suéter',
+            'shirt': 'camiseta',
+            't-shirt': 'camiseta',
+            'pants': 'calça',
+            'shorts': 'shorts',
+            'jacket': 'jaqueta',
+            'blouse': 'blusa',
+            'skirt': 'saia',
+            'hoodie': 'moletom',
+            'coat': 'casaco',
+            'suit': 'terno',
+            'swimsuit': 'maiô',
+            'underwear': 'roupa íntima',
+            'socks': 'meias',
+            'shoes': 'sapatos',
+            'boots': 'botas',
+            'sandals': 'sandálias',
+            'hat': 'chapéu',
+            'cap': 'boné',
+            'scarf': 'cachecol',
+            'gloves': 'luvas',
+            'belt': 'cinto',
+            'bag': 'bolsa',
+            'backpack': 'mochila'
+        }
+
+        return categoryMap[categoryLower] || 'desconhecido'
     }
 } 

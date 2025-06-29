@@ -10,10 +10,29 @@ import Navbar from '../../components/components/ui/navbar'
 import { useCsrf } from '../../hooks/use-csrf'
 
 const CLOTHING_TYPES = [
-    { value: 'chapéu', label: 'Chapéu' },
     { value: 'camiseta', label: 'Camiseta' },
     { value: 'calça', label: 'Calça' },
-    { value: 'tênis', label: 'Tênis' },
+    { value: 'shorts', label: 'Shorts' },
+    { value: 'jaqueta', label: 'Jaqueta' },
+    { value: 'blusa', label: 'Blusa' },
+    { value: 'saia', label: 'Saia' },
+    { value: 'suéter', label: 'Suéter' },
+    { value: 'moletom', label: 'Moletom' },
+    { value: 'casaco', label: 'Casaco' },
+    { value: 'terno', label: 'Terno' },
+    { value: 'maiô', label: 'Maiô' },
+    { value: 'roupa íntima', label: 'Roupa Íntima' },
+    { value: 'meias', label: 'Meias' },
+    { value: 'sapatos', label: 'Sapatos' },
+    { value: 'botas', label: 'Botas' },
+    { value: 'sandálias', label: 'Sandálias' },
+    { value: 'chapéu', label: 'Chapéu' },
+    { value: 'boné', label: 'Boné' },
+    { value: 'cachecol', label: 'Cachecol' },
+    { value: 'luvas', label: 'Luvas' },
+    { value: 'cinto', label: 'Cinto' },
+    { value: 'bolsa', label: 'Bolsa' },
+    { value: 'mochila', label: 'Mochila' },
 ]
 
 export default function ClothingCreate() {
