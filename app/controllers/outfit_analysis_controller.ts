@@ -1028,7 +1028,8 @@ export default class OutfitAnalysisController {
                         percentage: apiData.classifications?.torso?.top_prediction?.percentage || '0%'
                     },
                     detectedName: apiData.classifications?.torso?.top_prediction?.name || 'Suéter',
-                    detectedType: this.getDetectedType(apiData.classifications?.torso?.top_prediction?.category)
+                    detectedType: this.getDetectedType(apiData.classifications?.torso?.top_prediction?.category),
+                    color_analysis: (apiData.classifications?.torso as any)?.color_analysis || (apiData.body_parts?.torso as any)?.color_analysis || null
                 },
                 legs: {
                     image: apiData.saved_parts?.legs?.url ? `${baseUrl}${apiData.saved_parts.legs.url}` : '/defaults/clothing.png',
@@ -1039,7 +1040,8 @@ export default class OutfitAnalysisController {
                         percentage: apiData.classifications?.legs?.top_prediction?.percentage || '0%'
                     },
                     detectedName: apiData.classifications?.legs?.top_prediction?.name || 'Calça',
-                    detectedType: this.getDetectedType(apiData.classifications?.legs?.top_prediction?.category)
+                    detectedType: this.getDetectedType(apiData.classifications?.legs?.top_prediction?.category),
+                    color_analysis: (apiData.classifications?.legs as any)?.color_analysis || (apiData.body_parts?.legs as any)?.color_analysis || null
                 },
                 feet: {
                     image: apiData.saved_parts?.feet?.url ? `${baseUrl}${apiData.saved_parts.feet.url}` : '/defaults/clothing.png',
@@ -1050,7 +1052,8 @@ export default class OutfitAnalysisController {
                         percentage: apiData.classifications?.feet?.top_prediction?.percentage || '0%'
                     },
                     detectedName: apiData.classifications?.feet?.top_prediction?.name || 'Sapatos',
-                    detectedType: this.getDetectedType(apiData.classifications?.feet?.top_prediction?.category)
+                    detectedType: this.getDetectedType(apiData.classifications?.feet?.top_prediction?.category),
+                    color_analysis: (apiData.classifications?.feet as any)?.color_analysis || (apiData.body_parts?.feet as any)?.color_analysis || null
                 }
             },
             // Dados de compatibilidade (legado)

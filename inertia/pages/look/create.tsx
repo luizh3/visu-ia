@@ -72,7 +72,6 @@ export default function LookCreate() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
             })
-            console.log(payload)
             if (!res.ok) throw new Error('Erro ao buscar sugestões')
             const data = await res.json()
             setSuggestions(data)

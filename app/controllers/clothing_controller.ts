@@ -183,7 +183,7 @@ export default class ClothingController {
     }
 
     const clothes = await Clothing.query()
-      .where('name', 'like', `%${query.trim()}%`)
+      .whereRaw('LOWER(name) LIKE ?', [`%${query.trim().toLowerCase()}%`])
       .limit(10)
       .exec()
 

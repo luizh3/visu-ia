@@ -30,6 +30,9 @@ interface BodyPartData {
     }
     detectedName: string
     detectedType: string
+    color_analysis?: {
+        dominant_color: string
+    }
 }
 
 // Novas interfaces para compatibilidade de outfit
@@ -194,13 +197,20 @@ export default function OutfitAnalysisShow({ analysisData }: { analysisData: Ana
     const [imageLoading, setImageLoading] = useState<Record<string, boolean>>({
         original: true
     })
+
+    console.log("Torso color:", analysisData.bodyParts.torso.color_analysis?.dominant_color)
+    console.log("Legs color:", analysisData.bodyParts.legs.color_analysis?.dominant_color)
+
+
+    console.log(analysisData)
+
     const [clothingForms, setClothingForms] = useState<Record<string, ClothingFormData>>({
         torso: {
             name: analysisData.bodyParts.torso.detectedName,
             description: '',
             type: analysisData.bodyParts.torso.detectedType,
-            color: '',
-            size: 'M',
+            color: analysisData.bodyParts.torso.color_analysis?.dominant_color || '',
+            size: '',
             image: analysisData.bodyParts.torso.image,
             category: analysisData.bodyParts.torso.classification.category
         },
@@ -208,8 +218,8 @@ export default function OutfitAnalysisShow({ analysisData }: { analysisData: Ana
             name: analysisData.bodyParts.legs.detectedName,
             description: '',
             type: analysisData.bodyParts.legs.detectedType,
-            color: '',
-            size: 'M',
+            color: analysisData.bodyParts.legs.color_analysis?.dominant_color || '',
+            size: '',
             image: analysisData.bodyParts.legs.image,
             category: analysisData.bodyParts.legs.classification.category
         },
@@ -217,8 +227,8 @@ export default function OutfitAnalysisShow({ analysisData }: { analysisData: Ana
             name: analysisData.bodyParts.feet.detectedName,
             description: '',
             type: analysisData.bodyParts.feet.detectedType,
-            color: '',
-            size: 'M',
+            color: analysisData.bodyParts.feet.color_analysis?.dominant_color || '',
+            size: '',
             image: analysisData.bodyParts.feet.image,
             category: analysisData.bodyParts.feet.classification.category
         }
@@ -454,6 +464,8 @@ export default function OutfitAnalysisShow({ analysisData }: { analysisData: Ana
                             const formData = clothingForms[key]
                             const isSaved = savedClothing.includes(key)
                             const isSaving = savingClothing === key
+
+                            console.log("current color:", formData.color)
 
                             return (
                                 <Card key={key} className="relative">

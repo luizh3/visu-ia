@@ -48,6 +48,13 @@ export default function ImageUploadColorPicker({
         }
     }, [imagePreview])
 
+    useEffect(() => {
+        // Só sobrescreve se currentColor estiver vazio
+        if ((!currentColor || currentColor === '') && dominantColors.length > 0) {
+            onColorChange(dominantColors[0])
+        }
+    }, [dominantColors, currentColor, onColorChange])
+
     const extractDominantColors = (img: HTMLImageElement) => {
         setIsExtractingColors(true)
         try {
