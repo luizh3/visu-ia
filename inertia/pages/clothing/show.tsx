@@ -23,7 +23,7 @@ export default function ClothingShow({ clothing }: Props) {
                 method: 'DELETE'
             })
             if (response.ok || response.status === 302) {
-                window.location.href = '/clothing'
+                window.location.href = '/'
             } else {
                 try {
                     const errorData = await response.json()
